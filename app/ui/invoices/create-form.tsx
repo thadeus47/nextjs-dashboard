@@ -1,5 +1,6 @@
 'use client';
-
+ 
+import { useFormState } from 'react-dom';
 import { CustomerField } from '@/app/lib/definitions';
 import Link from 'next/link';
 import {
@@ -10,57 +11,14 @@ import {
 } from '@heroicons/react/24/outline';
 import { Button } from '@/app/ui/button';
 import { createInvoice } from '@/app/lib/actions';
-import { useFormState } from 'react-dom';
 
-export type State = {
-  errors?: {
-    customerId?: string[];
-    amount?: string[];
-    status?: string[];
-  };
-  message?: string | null;
-};
- 
-export async function createInvoice(prevState: State, formData: FormData) {
- // Validate form using Zod
- const validatedFields = CreateInvoice.safeParse({
-  customerId: formData.get('customerId'),
-  amount: formData.get('amount'),
-  status: formData.get('status'),
-});
 
-// If form validation fails, return errors early. Otherwise, continue.
-if (!validatedFields.success) {
-  return {
-    errors: validatedFields.error.flatten().fieldErrors,
-    message: 'Missing Fields. Failed to Create Invoice.',
-  };
-}
-
-// Prepare data for insertion into the database
-const { customerId, amount, status } = validatedFields.data;
-const amountInCents = amount * 100;
-const date = new Date().toISOString().split('T')[0];
-
-// Insert data into the database
-try {
-  await sql`
-    INSERT INTO invoices (customer_id, amount, status, date)
-    VALUES (${customerId}, ${amountInCents}, ${status}, ${date})
-  `;
-} catch (error) {
-  // If a database error occurs, return a more specific error.
-  return {
-    message: 'Database Error: Failed to Create Invoice.',
-  };
-}
-
-// Revalidate the cache for the invoices page and redirect the user.
-revalidatePath('/dashboard/invoices');
-redirect('/dashboard/invoices');
+export default function Form({ customers }: { customers: CustomerField[] }) {
+  const initialState = { message: null, errors: {} };
+  const [state, dispatch] = useFormState(createInvoice, initialState);
 
   return (
-    <form action={createInvoice}>
+    <form action={dispatch}>
       <div className="rounded-md bg-gray-50 p-4 md:p-6">
         {/* Customer Name */}
         <div className="mb-4">
@@ -73,6 +31,7 @@ redirect('/dashboard/invoices');
               name="customerId"
               className="peer block w-full cursor-pointer rounded-md border border-gray-200 py-2 pl-10 text-sm outline-2 placeholder:text-gray-500"
               defaultValue=""
+              aria-describedby="customer-error"
             >
               <option value="" disabled>
                 Select a customer
@@ -85,6 +44,14 @@ redirect('/dashboard/invoices');
             </select>
             <UserCircleIcon className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-500" />
           </div>
+          <div id="customer-error" aria-live="polite" aria-atomic="true">
+        {state.errors?.customerId &&
+          state.errors.customerId.map((error: string) => (
+            <p className="mt-2 text-sm text-red-500" key={error}>
+              {error}
+            </p>
+          ))}
+      </div>
         </div>
 
         {/* Invoice Amount */}
